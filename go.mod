@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/kr/text v0.2.0 // indirect
+	github.com/lib/pq v1.10.0
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/stretchr/testify v1.7.0 // indirect

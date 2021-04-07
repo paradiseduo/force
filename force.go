@@ -12,6 +12,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 	"github.com/schollz/progressbar/v3"
 	"golang.org/x/crypto/ssh"
 )
@@ -19,8 +20,9 @@ import (
 var ip = flag.String("ip", "", "地址")
 var port = flag.String("port", "22", "端口")
 var user = flag.String("user", "root", "用户名")
-var password = flag.String("password", "root", "密码")
-var mode = flag.String("mode", "ssh", "爆破选项: ssh/mysql")
+var password = flag.String("password", "", "密码")
+var mode = flag.String("mode", "ssh", "爆破选项: ssh/mysql/postgres")
+var timeout = flag.Int("-timeout", 3, "超时时间，默认3秒")
 
 var mutex sync.RWMutex
 var scanedNum int
@@ -77,6 +79,16 @@ func main() {
 		} else {
 			doMySQLs(ips, *port, *user, *password, bar)
 		}
+	case "postgres":
+		if len(ips) > 1 {
+			for i := 0; i < COROUTNUM; i++ {
+				go doPostgress(ips[i*groupLength:((i+1)*groupLength)], *port, *user, *password, bar)
+			}
+			go doPostgress(ips[COROUTNUM*groupLength:], *port, *user, *password, bar)
+			wg.Wait()
+		} else {
+			doPostgress(ips, *port, *user, *password, bar)
+		}
 	default:
 		flag.Usage()
 	}
@@ -108,7 +120,7 @@ func doSSH(ip, port, user, password string) bool {
 		User:            user,
 		Auth:            []ssh.AuthMethod{ssh.Password(password)},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         3 * time.Second,
+		Timeout:         time.Duration(*timeout) * time.Second,
 	})
 	if err == nil {
 		fmt.Println("\nSSH Success", ip, port, user, password)
@@ -130,12 +142,37 @@ func doMySQLs(ips []string, port, user, password string, bar *progressbar.Progre
 }
 
 func doMySQL(ip, port, user, password string) bool {
-	sss := user + ":" + password + "@tcp(" + ip + ":" + port + ")/mysql?charset=utf8&timeout=3s"
+	sss := user + ":" + password + "@tcp(" + ip + ":" + port + ")/mysql?charset=utf8&timeout=" + strconv.Itoa(*timeout) + "s"
 	db, err := sql.Open("mysql", sss)
 	if err == nil {
 		if er := db.Ping(); er == nil {
 			defer db.Close()
 			fmt.Println("\nMySQL Success", ip, port, user, password)
+			return true
+		}
+	}
+	return false
+}
+
+func doPostgress(ips []string, port, user, password string, bar *progressbar.ProgressBar) {
+	for _, v := range ips {
+		if doPostgres(v, port, user, password) {
+			bar.Clear()
+		}
+		mutex.Lock()
+		scanedNum += 1
+		mutex.Unlock()
+	}
+	wg.Done()
+}
+
+func doPostgres(ip, port, user, password string) bool {
+	dataSourceName := "postgres://" + user + ":" + password + "@" + ip + ":" + port + "/postgres?sslmode=disable&connect_timeout=" + strconv.Itoa(*timeout)
+	db, err := sql.Open("postgres", dataSourceName)
+	if err == nil {
+		if er := db.Ping(); er == nil {
+			defer db.Close()
+			fmt.Println("\nPostgres Success", ip, port, user, password)
 			return true
 		}
 	}
