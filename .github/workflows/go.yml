@@ -21,9 +21,8 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - name: Get dependencies, run test and static check
+      - name: Get dependencies, static check
         run: |
-          go test ./...
           go vet ./...
           go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck -- $(go list ./...)
