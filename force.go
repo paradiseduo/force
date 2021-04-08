@@ -56,6 +56,9 @@ func main() {
 	bar := progressbar.NewOptions(len(ips), progressbar.OptionSetRenderBlankState(true))
 	go printProcess(bar)
 	COROUTNUM := runtime.GOMAXPROCS(runtime.NumCPU())
+	if len(ips) < COROUTNUM {
+		COROUTNUM = len(ips)
+	}
 	groupLength := len(ips) / COROUTNUM
 	wg.Add(COROUTNUM)
 	switch *mode {
