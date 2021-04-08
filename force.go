@@ -49,6 +49,9 @@ func main() {
 		for i := start; i <= end; i++ {
 			ips = append(ips, ipStart+"."+strconv.Itoa(i))
 		}
+	} else if strings.ContainsAny(*ip, ",") {
+		ips = strings.Split(*ip, ",")
+		fmt.Println(ips)
 	} else {
 		ips = append(ips, *ip)
 	}
