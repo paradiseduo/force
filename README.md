@@ -15,7 +15,7 @@
 |8|postgres|✅|
 |9|hive|❌|
 |10|redis|❌|
-|11|mangoDB|❌|
+|11|mangoDB|✅|
 |12|rdp|❌|
 
 
