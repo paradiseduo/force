@@ -9,6 +9,7 @@ require (
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/stretchr/testify v1.7.0 // indirect
+	go.mongodb.org/mongo-driver v1.5.1
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57 // indirect
 	golang.org/x/term v0.0.0-20210406210042-72f3dc4e9b72 // indirect

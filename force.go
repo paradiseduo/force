@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -14,6 +15,10 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 	"github.com/schollz/progressbar/v3"
+	"go.mongodb.org/mongo-driver/mongo"
+	_ "go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -21,7 +26,7 @@ var ip = flag.String("ip", "", "地址")
 var port = flag.String("port", "22", "端口")
 var user = flag.String("user", "root", "用户名")
 var password = flag.String("password", "", "密码")
-var mode = flag.String("mode", "ssh", "爆破选项: ssh/mysql/postgres")
+var mode = flag.String("mode", "ssh", "爆破选项: ssh/mysql/postgres/mongo")
 var timeout = flag.Int("-timeout", 3, "超时时间，默认3秒")
 
 var mutex sync.RWMutex
@@ -51,7 +56,6 @@ func main() {
 		}
 	} else if strings.ContainsAny(*ip, ",") {
 		ips = strings.Split(*ip, ",")
-		fmt.Println(ips)
 	} else {
 		ips = append(ips, *ip)
 	}
@@ -94,6 +98,16 @@ func main() {
 			wg.Wait()
 		} else {
 			doPostgress(ips, *port, *user, *password, bar)
+		}
+	case "mongo":
+		if len(ips) > 1 {
+			for i := 0; i < COROUTNUM; i++ {
+				go doMongos(ips[i*groupLength:((i+1)*groupLength)], *port, *user, *password, bar)
+			}
+			go doMongos(ips[COROUTNUM*groupLength:], *port, *user, *password, bar)
+			wg.Wait()
+		} else {
+			doMongos(ips, *port, *user, *password, bar)
 		}
 	default:
 		flag.Usage()
@@ -179,6 +193,43 @@ func doPostgres(ip, port, user, password string) bool {
 		if er := db.Ping(); er == nil {
 			defer db.Close()
 			fmt.Println("\nPostgres Success", ip, port, user, password)
+			return true
+		}
+	}
+	return false
+}
+
+func doMongos(ips []string, port, user, password string, bar *progressbar.ProgressBar) {
+	for _, v := range ips {
+		if doMongo(v, port, user, password) {
+			bar.Clear()
+		}
+		mutex.Lock()
+		scanedNum += 1
+		mutex.Unlock()
+	}
+	wg.Done()
+}
+
+func doMongo(ip, port, user, password string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	uri := "mongodb://" + user + ":" + password + "@" + ip + ":" + port
+	if password == "" {
+		uri = "mongodb://" + ip + ":" + port
+		user = ""
+	}
+
+	opt := new(options.ClientOptions)
+	du, _ := time.ParseDuration(strconv.Itoa(*timeout * 1000))
+	opt = opt.SetConnectTimeout(du)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri), opt)
+
+	if err == nil {
+		e := client.Ping(ctx, readpref.Primary())
+		if e == nil {
+			defer client.Disconnect(ctx)
+			fmt.Println("\nMongoDB Success", ip, port, user, password)
 			return true
 		}
 	}
