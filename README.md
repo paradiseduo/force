@@ -26,15 +26,15 @@
 > ./force 
 Usage of ./force:
   --timeout int
-        超时时间，默认3秒 (default 3)
+    	超时时间，默认3秒 (default 3)
   -ip string
-        地址
+    	地址
   -mode string
-        爆破选项: ssh/mysql/postgres (default "ssh")
+    	爆破选项: ssh/ftp/mysql/postgres/mongo (default "ssh")
   -password string
-        密码
+    	密码
   -port string
-        端口 (default "22")
+    	端口 (default "22")
   -user string
-        用户名 (default "root")
+    	用户名
 ```
