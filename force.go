@@ -13,6 +13,8 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jlaffaye/ftp"
+	_ "github.com/jlaffaye/ftp"
 	_ "github.com/lib/pq"
 	"github.com/schollz/progressbar/v3"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,9 +26,9 @@ import (
 
 var ip = flag.String("ip", "", "地址")
 var port = flag.String("port", "22", "端口")
-var user = flag.String("user", "root", "用户名")
+var user = flag.String("user", "", "用户名")
 var password = flag.String("password", "", "密码")
-var mode = flag.String("mode", "ssh", "爆破选项: ssh/mysql/postgres/mongo")
+var mode = flag.String("mode", "ssh", "爆破选项: ssh/ftp/mysql/postgres/mongo")
 var timeout = flag.Int("-timeout", 3, "超时时间，默认3秒")
 
 var mutex sync.RWMutex
@@ -108,6 +110,16 @@ func main() {
 			wg.Wait()
 		} else {
 			doMongos(ips, *port, *user, *password, bar)
+		}
+	case "ftp":
+		if len(ips) > 1 {
+			for i := 0; i < COROUTNUM; i++ {
+				go doFTPs(ips[i*groupLength:((i+1)*groupLength)], *port, *user, *password, bar)
+			}
+			go doFTPs(ips[COROUTNUM*groupLength:], *port, *user, *password, bar)
+			wg.Wait()
+		} else {
+			doFTPs(ips, *port, *user, *password, bar)
 		}
 	default:
 		flag.Usage()
@@ -230,6 +242,34 @@ func doMongo(ip, port, user, password string) bool {
 		if e == nil {
 			defer client.Disconnect(ctx)
 			fmt.Println("\nMongoDB Success", ip, port, user, password)
+			return true
+		}
+	}
+	return false
+}
+
+func doFTPs(ips []string, port, user, password string, bar *progressbar.ProgressBar) {
+	for _, v := range ips {
+		if doFTP(v, port, user, password) {
+			bar.Clear()
+		}
+		mutex.Lock()
+		scanedNum += 1
+		mutex.Unlock()
+	}
+	wg.Done()
+}
+
+func doFTP(ip, port, user, password string) bool {
+	client, err := ftp.Dial(ip+":"+port, ftp.DialWithTimeout(time.Duration(*timeout)*time.Second))
+	if err == nil {
+		if user == "" {
+			user = "anonymous"
+		}
+		err = client.Login(user, password)
+		if err == nil {
+			defer client.Quit()
+			fmt.Println("\nFTP Success", ip, port, user, password)
 			return true
 		}
 	}

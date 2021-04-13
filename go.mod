@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/go-sql-driver/mysql v1.6.0
+	github.com/jlaffaye/ftp v0.0.0-20210307004419-5d4190119067
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lib/pq v1.10.0
 	github.com/mattn/go-runewidth v0.0.12 // indirect
