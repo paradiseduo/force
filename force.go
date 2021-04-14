@@ -13,12 +13,11 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/jlaffaye/ftp"
-	_ "github.com/jlaffaye/ftp"
+	ftp "github.com/jlaffaye/ftp"
 	_ "github.com/lib/pq"
+	elastic "github.com/olivere/elastic/v7"
 	"github.com/schollz/progressbar/v3"
-	"go.mongodb.org/mongo-driver/mongo"
-	_ "go.mongodb.org/mongo-driver/mongo"
+	mongo "go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"golang.org/x/crypto/ssh"
@@ -28,7 +27,7 @@ var ip = flag.String("ip", "", "地址")
 var port = flag.String("port", "22", "端口")
 var user = flag.String("user", "", "用户名")
 var password = flag.String("password", "", "密码")
-var mode = flag.String("mode", "ssh", "爆破选项: ssh/ftp/mysql/postgres/mongo")
+var mode = flag.String("mode", "ssh", "爆破选项: ssh/ftp/mysql/postgres/mongo/es")
 var timeout = flag.Int("-timeout", 3, "超时时间，默认3秒")
 
 var mutex sync.RWMutex
@@ -120,6 +119,16 @@ func main() {
 			wg.Wait()
 		} else {
 			doFTPs(ips, *port, *user, *password, bar)
+		}
+	case "es":
+		if len(ips) > 1 {
+			for i := 0; i < COROUTNUM; i++ {
+				go doElasticSearchs(ips[i*groupLength:((i+1)*groupLength)], *port, *user, *password, bar)
+			}
+			go doElasticSearchs(ips[COROUTNUM*groupLength:], *port, *user, *password, bar)
+			wg.Wait()
+		} else {
+			doElasticSearchs(ips, *port, *user, *password, bar)
 		}
 	default:
 		flag.Usage()
@@ -270,6 +279,35 @@ func doFTP(ip, port, user, password string) bool {
 		if err == nil {
 			defer client.Quit()
 			fmt.Println("\nFTP Success", ip, port, user, password)
+			return true
+		}
+	}
+	return false
+}
+
+func doElasticSearchs(ips []string, port, user, password string, bar *progressbar.ProgressBar) {
+	for _, v := range ips {
+		if doElasticSearch(v, port, user, password) {
+			bar.Clear()
+		}
+		mutex.Lock()
+		scanedNum += 1
+		mutex.Unlock()
+	}
+	wg.Done()
+}
+
+func doElasticSearch(ip, port, user, password string) bool {
+	url := "http://" + ip + ":" + port
+	client, err := elastic.NewClient(elastic.SetSniff(false),
+		elastic.SetURL(url),
+		elastic.SetBasicAuth(user, password),
+	)
+	if err == nil {
+		ctx := context.Background()
+		_, _, err = client.Ping(url).Do(ctx)
+		if err == nil {
+			fmt.Println("\nElasticSearch Success", ip, port, user, password)
 			return true
 		}
 	}

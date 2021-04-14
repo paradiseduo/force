@@ -17,6 +17,7 @@
 |10|redis|❌|
 |11|mangoDB|✅|
 |12|rdp|❌|
+|13|Elasticsearch|✅|
 
 
 ## 使用方式
@@ -30,7 +31,7 @@ Usage of ./force:
   -ip string
     	地址
   -mode string
-    	爆破选项: ssh/ftp/mysql/postgres/mongo (default "ssh")
+    	爆破选项: ssh/ftp/mysql/postgres/mongo/es (default "ssh")
   -password string
     	密码
   -port string
